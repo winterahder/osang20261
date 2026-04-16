@@ -168,8 +168,8 @@ h1{font-size:20px;font-weight:600;color:#1a1a18;margin-bottom:4px}
 </head>
 <body>
 <div class="wrap">
-<h1>1학년 3월 모의고사 · 학생 능력치 분석</h1>
-<p class="sub">2026년 3월 전국연합학력평가 · 256명 전체 · 등급·백분위 + 문항별 영역 분석</p>
+<h1>1학년 · 학생 능력치 분석</h1>
+<p class="sub">2026학년도 · 256명 전체 · 내신 &amp; 모의고사 등급·백분위 + 문항별 영역 분석</p>
 
 <div class="panel" id="clsSection">
   <div class="plabel">반 선택</div>
@@ -178,7 +178,16 @@ h1{font-size:20px;font-weight:600;color:#1a1a18;margin-bottom:4px}
 
 <div class="panel" id="stuSection" style="display:none">
   <div class="plabel" id="stuLabel"></div>
-  <div class="stu-grid" id="stuGrid"></div>
+  <div style="display:flex;gap:16px;align-items:flex-start">
+    <div id="stuGrid" style="flex:0 0 160px"></div>
+    <div id="navArea" style="flex:1;border-left:1px solid #ebebde;padding-left:16px">
+      <div class="plabel" id="navLabel" style="margin-bottom:10px"></div>
+      <div class="cls-btns" id="navBtns"></div>
+      <div id="navSubBtnsWrap" style="margin-top:10px;display:none">
+        <div class="cls-btns" id="navSubBtns"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div id="cardArea"><div class="detail-card"><div class="ph">위에서 반을 선택한 후 학생을 클릭하면<br>문항별 영역 분석이 표시됩니다</div></div></div>
@@ -192,6 +201,7 @@ const SC_COL={'국어':'#7f77dd','수학':'#378add','영어':'#1d9e75','한국�
 const ACC={'1':'#0b8a5e','2':'#1060b0','3':'#4a3fa0','4':'#888780','5':'#c08000','6':'#b02020','7':'#b02020','8':'#b02020','9':'#b02020'};
 
 let curCls=null,curStu=null,curStuData=null,_printHtml='';
+let curCategory=null,curExam=null;
 
 /* ── 학생 정보 CSV 로더 ── */
 let stuInfo={};
@@ -242,15 +252,103 @@ Object.keys(ALL).sort((a,b)=>+a-+b).forEach(cls=>{  const btn=document.createEle
   cb.appendChild(btn);
 });
 
+/* ── 내신 항목 ── */
+const NAESIN_ITEMS=[
+  {key:'mid1',label:'1학기 중간고사'},
+  {key:'fin1',label:'1학기 기말고사'},
+  {key:'tot1',label:'1학기 종합성적'},
+  {key:'mid2',label:'2학기 중간고사'},
+  {key:'fin2',label:'2학기 기말고사'},
+  {key:'tot2',label:'2학기 종합성적'},
+];
+/* ── 모의고사 항목 ── */
+const MOCK_ITEMS=[
+  {key:'mar',label:'3월'},
+  {key:'jun',label:'6월'},
+  {key:'sep',label:'9월'},
+  {key:'nov',label:'11월'},
+];
+
 function selClass(cls){
-  curCls=cls;curStu=null;curStuData=null;
+  curCls=cls; curStu=null; curStuData=null; curCategory=null; curExam=null;
   document.querySelectorAll('.cb').forEach(b=>b.classList.toggle('on',b.textContent===cls+'반'));
-  const panel=document.getElementById('stuSection');
-  panel.style.display='block';
+
+  const stuSec=document.getElementById('stuSection');
+  stuSec.style.display='block';
   document.getElementById('stuLabel').textContent=cls+'반 · '+ALL[cls].length+'명';
-  document.getElementById('stuGrid').innerHTML='<div class="stu-list">'+ALL[cls].map(s=>`<button class="sli" id="sb${s.n}" onclick="pick(${s.n})"><span class="sli-num">${s.n}</span><span class="sli-nm">${s.nm}</span></button>`).join('')+'</div>';
-  document.getElementById('cardArea').innerHTML='<div class="detail-card"><div class="ph">이름을 클릭하면 문항별 영역 분석이 표시됩니다</div></div>';
-  panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+
+  // 학생 목록
+  document.getElementById('stuGrid').innerHTML=
+    '<div class="stu-list">'+
+    ALL[cls].map(s=>
+      `<button class="sli" id="sb${s.n}" onclick="pick(${s.n})"><span class="sli-num">${s.n}</span><span class="sli-nm">${s.nm}</span></button>`
+    ).join('')+
+    '</div>';
+
+  // 오른쪽: 내신/모의고사 버튼
+  document.getElementById('navLabel').textContent='항목 선택';
+  document.getElementById('navBtns').innerHTML=
+    ['내신','모의고사'].map(cat=>
+      `<button class="cb" onclick="selCategory('${cat}')">${cat}</button>`
+    ).join('');
+  document.getElementById('navSubBtnsWrap').style.display='none';
+  document.getElementById('navSubBtns').innerHTML='';
+
+  document.getElementById('cardArea').innerHTML='<div class="detail-card"><div class="ph">학생 이름을 선택한 뒤 항목을 골라주세요</div></div>';
+  stuSec.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function selCategory(cat){
+  curCategory=cat; curExam=null;
+  document.querySelectorAll('#navBtns .cb').forEach(b=>b.classList.toggle('on',b.textContent===cat));
+
+  const items = cat==='내신' ? NAESIN_ITEMS : MOCK_ITEMS;
+  const wrap=document.getElementById('navSubBtnsWrap');
+  wrap.style.display='block';
+  const isNaesin = cat==='내신';
+  document.getElementById('navSubBtns').innerHTML= isNaesin
+    ? `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px">`+
+      items.map(it=>`<button class="cb" style="text-align:center" onclick="selExam('${it.key}','${it.label}')">${it.label}</button>`).join('')+
+      `</div>`
+    : items.map(it=>`<button class="cb" onclick="selExam('${it.key}','${it.label}')">${it.label}</button>`).join('');
+
+  document.getElementById('cardArea').innerHTML='<div class="detail-card"><div class="ph">세부 항목을 선택해 주세요</div></div>';
+}
+
+function selExam(key,label){
+  curExam=key;
+  document.querySelectorAll('#navSubBtns .cb').forEach(b=>b.classList.toggle('on',b.textContent===label));
+
+  const hasData = (curCategory==='모의고사' && key==='mar');
+
+  // 학생 목록 갱신 (클릭 가능 여부 반영)
+  const stuList = document.querySelector('#stuGrid .stu-list');
+  if(stuList){
+    stuList.querySelectorAll('.sli').forEach(btn=>{
+      btn.disabled = !hasData;
+      btn.style.opacity = hasData ? '' : '0.4';
+      btn.style.cursor = hasData ? '' : 'default';
+    });
+  }
+
+  if(hasData){
+    if(curStu!==null && curStuData){
+      tryShowCard();
+    } else {
+      document.getElementById('cardArea').innerHTML='<div class="detail-card"><div class="ph">이름을 클릭하면 분석이 표시됩니다</div></div>';
+    }
+  } else {
+    document.getElementById('cardArea').innerHTML='<div class="detail-card"><div class="ph" style="color:#c0bfb5">📋 '+label+' 데이터는 아직 준비 중입니다</div></div>';
+  }
+}
+
+/* 학생 + 항목 둘 다 선택됐을 때 카드 렌더 */
+function tryShowCard(){
+  const hasData = (curCategory==='모의고사' && curExam==='mar');
+  if(hasData && curStuData){
+    renderCard(curStuData);
+    document.getElementById('cardArea').scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
 }
 
 function pick(n){
@@ -259,7 +357,12 @@ function pick(n){
   document.getElementById('sb'+n).classList.add('on');
   const stu=ALL[curCls].find(s=>s.n===n);
   curStuData=stu;
-  if(stu)renderCard(stu);
+  // 항목(카테고리+세부)까지 선택된 경우에만 카드 표시
+  if(stu && curExam){
+    tryShowCard();
+  } else {
+    document.getElementById('cardArea').innerHTML='<div class="detail-card"><div class="ph">이제 아래에서 항목을 선택해 주세요</div></div>';
+  }
   document.getElementById('cardArea').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
