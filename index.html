@@ -1005,7 +1005,7 @@ function renderSciCard(stu) {
     <div class="detail-card">
       <div style="display:flex;gap:16px;align-items:center;margin-bottom:16px">
         <img src="${pSrc}" style="width:72px;height:96px;border-radius:8px;object-fit:cover;object-position:top;border:1px solid #e8e7e0;flex-shrink:0"
-          onerror="if(this.src.endsWith('.jpg')){this.src=this.src.replace('.jpg','.jpeg')}else{this.style.display='none'}">
+          onerror="if(this.src.endsWith('.jpg')){this.src=this.src.replace('.jpg','.jpeg')}else if(this.src.endsWith('.jpeg')){this.src=this.src.replace('.jpeg','.png')}else{this.style.display='none'}">
         <div>
           <div style="font-size:20px;font-weight:700;color:#1a1a18">${stu.nm}
             <span style="font-size:14px;color:#999890;font-weight:500">${curCls}반 ${stu.n}번</span>
@@ -1046,7 +1046,7 @@ function renderSciCard(stu) {
     <div class="detail-card">
       <div style="display:flex;gap:16px;align-items:center;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #e8e7e0">
         <img src="${pSrc}" style="width:72px;height:96px;border-radius:8px;object-fit:cover;object-position:top;border:1px solid #e8e7e0;flex-shrink:0"
-          onerror="if(this.src.endsWith('.jpg')){this.src=this.src.replace('.jpg','.jpeg')}else{this.style.display='none'}">
+          onerror="if(this.src.endsWith('.jpg')){this.src=this.src.replace('.jpg','.jpeg')}else if(this.src.endsWith('.jpeg')){this.src=this.src.replace('.jpeg','.png')}else{this.style.display='none'}">
         <div style="flex:1;min-width:0">
           <div style="font-size:20px;font-weight:700;color:#1a1a18">${stu.nm}
             <span style="font-size:14px;color:#999890;font-weight:500">${curCls}반 ${stu.n}번</span>
