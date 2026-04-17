@@ -263,6 +263,19 @@ async function loadStuInfo(){
 }
 loadStuInfo();
 
+/* ── 동아리 활동 데이터 로더 ── */
+let clubData={};
+async function loadClubData(){
+  try{
+    const resp=await fetch('data/club_2026.json');
+    if(!resp.ok)return;
+    const d=await resp.json();
+    clubData=d.students||{};
+    console.log('동아리 데이터 로드 완료:', Object.keys(clubData).length+'명');
+  }catch(e){console.log('club_2026.json 로드 실패(로컬 정상):',e);}
+}
+loadClubData();
+
 const PHOTOS={};
 function uploadPhotos(inp){
   Array.from(inp.files).forEach(f=>{
@@ -412,7 +425,7 @@ async function selExam(key,label){
       const stuList=document.querySelector('#stuGrid .stu-list');
       if(stuList) stuList.querySelectorAll('.sli').forEach(btn=>{btn.disabled=false;btn.style.opacity='';btn.style.cursor='';});
       if(curStu!==null && curStuData){
-        renderCard(curStuData);
+        renderClubCard(curStuData);
         document.getElementById('cardArea').scrollIntoView({behavior:'smooth',block:'nearest'});
       } else {
         document.getElementById('cardArea').innerHTML='<div class="detail-card"><div class="ph">이름을 클릭하면 동아리 정보가 표시됩니다</div></div>';
@@ -475,7 +488,12 @@ function pick(n){
   curStuData=stu;
   // 항목(카테고리+세부)까지 선택된 경우에만 카드 표시
   if(stu && curExam){
-    tryShowCard();
+    if(curMockKey==='club'){
+      renderClubCard(stu);
+      document.getElementById('cardArea').scrollIntoView({behavior:'smooth',block:'nearest'});
+    } else {
+      tryShowCard();
+    }
   } else {
     document.getElementById('cardArea').innerHTML='<div class="detail-card"><div class="ph">이제 아래에서 항목을 선택해 주세요</div></div>';
   }
@@ -532,6 +550,60 @@ body{background:#fff;padding:12mm}
 </head><body>${cardHtml}</body></html>`);
   win.document.close();
   win.onload = () => { win.focus(); win.print(); };
+}
+
+
+/* ── 동아리 전용 카드 렌더 ── */
+function renderClubCard(stu){
+  const hakbun='1'+String(curCls).padStart(2,'0')+String(stu.n).padStart(2,'0');
+  const info=stuInfo[hakbun]||{};
+  const pSrc=`photos/${curCls}반/${hakbun}.jpg`;
+  const actData=clubData[hakbun];
+
+  // 활동 내용 HTML
+  let actHtml='';
+  if(actData&&actData.activities&&actData.activities.length){
+    actHtml=actData.activities.map(act=>`
+      <div style="background:#f5f4ee;border-radius:10px;padding:14px 16px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-size:11px;background:#dff4ec;color:#0b6e4f;border-radius:5px;padding:2px 8px;font-weight:600">${act.type}</span>
+          <span style="font-size:13px;font-weight:700;color:#1a1a18">${act.title}</span>
+          ${act.date?`<span style="font-size:11px;color:#999890;margin-left:auto">${act.date}</span>`:''}
+        </div>
+        <p style="font-size:13px;color:#444340;line-height:1.7;margin-bottom:10px">${act.summary}</p>
+        ${act.keywords&&act.keywords.length?`
+        <div style="display:flex;flex-wrap:wrap;gap:5px">
+          ${act.keywords.map(k=>`<span style="font-size:11px;background:#dbeeff;color:#1060b0;border-radius:10px;padding:2px 8px">#${k}</span>`).join('')}
+        </div>`:''}
+      </div>`).join('');
+  } else {
+    actHtml=`<div style="text-align:center;padding:30px;color:#c0bfb5;font-size:13px">아직 등록된 활동 내용이 없습니다</div>`;
+  }
+
+  document.getElementById('cardArea').innerHTML=`
+  <div class="detail-card">
+    <div style="display:flex;gap:16px;margin-bottom:16px;align-items:flex-start">
+      <div style="flex-shrink:0">
+        <img src="${pSrc}"
+          style="width:108px;height:144px;border-radius:8px;object-fit:cover;object-position:top;border:1px solid #e8e7e0;display:block"
+          onerror="this.outerHTML='<div style=\'width:108px;height:144px;border-radius:8px;background:#dbeeff;display:flex;align-items:center;justify-content:center;font-size:42px;font-weight:700;color:#1060b0\'>${stu.nm[0]}</div>'"
+        >
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:20px;font-weight:700;color:#1a1a18;margin-bottom:4px">
+          ${stu.nm} <span style="font-weight:500;font-size:14px;color:#999890">${curCls}반 ${stu.n}번</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:8px">
+          ${info.school?`<span style="font-size:12px;color:#555450;background:#f5f4ee;border-radius:6px;padding:3px 8px;font-weight:500">🏫 ${info.school}</span>`:''}
+          ${info.score?`<span style="font-size:12px;color:#555450;background:#f5f4ee;border-radius:6px;padding:3px 8px;font-weight:500">📋 내신 ${info.score}</span>`:''}
+          ${info.club?`<span style="font-size:12px;color:#0b6e4f;background:#dff4ec;border-radius:6px;padding:3px 8px;font-weight:600">🎯 ${info.club}</span>`:''}
+        </div>
+      </div>
+    </div>
+    <div class="div-line"></div>
+    <div class="sec-title">동아리 활동 기록</div>
+    ${actHtml}
+  </div>`;
 }
 
 function renderCard(stu){
