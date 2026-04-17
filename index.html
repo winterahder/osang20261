@@ -618,7 +618,53 @@ function renderClubCard(stu){
           <span class="act-arrow" style="font-size:12px;color:#999890;flex-shrink:0;transition:transform .2s">▼</span>
         </button>
         <div class="act-body" style="display:none;padding:14px 16px;background:#fff">
-          <p style="font-size:13px;color:#444340;line-height:1.7;margin-bottom:10px">${act.summary}</p>
+          <!-- 계획서/보고서 탭 -->
+          <div style="display:flex;gap:0;margin-bottom:10px;border-bottom:2px solid #e8e7e0">
+            <button onclick="switchDreamTab(this,'tab-plan-${idx}')"
+              id="btn-plan-${idx}"
+              style="padding:7px 16px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#4a3fa0;border-bottom:2px solid #4a3fa0;margin-bottom:-2px">
+              📋 계획서
+            </button>
+            <button onclick="switchDreamTab(this,'tab-report-${idx}')"
+              id="btn-report-${idx}"
+              style="padding:7px 16px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#999890;border-bottom:2px solid transparent;margin-bottom:-2px">
+              📄 보고서 ${act.report&&act.report.status==='완료'?'✅':''}
+            </button>
+          </div>
+          <!-- 계획서 탭 내용 -->
+          <div id="tab-plan-${idx}">
+            <p style="font-size:13px;color:#444340;line-height:1.7;margin-bottom:10px">${act.summary}</p>
+          </div>
+          <!-- 보고서 탭 내용 -->
+          <div id="tab-report-${idx}" style="display:none">
+            ${act.report&&act.report.result_summary
+              ? `<div style="margin-bottom:10px">
+                  <div style="font-size:11px;color:#4a3fa0;font-weight:700;margin-bottom:4px">🔬 탐구 결과</div>
+                  <p style="font-size:13px;color:#444340;line-height:1.7">${act.report.result_summary}</p>
+                </div>`
+              : '<p style="font-size:13px;color:#aaa9a0;text-align:center;padding:20px 0">보고서가 아직 등록되지 않았습니다<br><span style="font-size:11px">탐구 완료 후 업데이트 예정</span></p>'
+            }
+            ${act.report&&act.report.conclusion
+              ? `<div style="background:#f0efff;border-radius:8px;padding:10px 12px;margin-bottom:10px">
+                  <div style="font-size:11px;color:#4a3fa0;font-weight:700;margin-bottom:4px">💡 결론 및 소감</div>
+                  <p style="font-size:13px;color:#444340;line-height:1.6">${act.report.conclusion}</p>
+                </div>`
+              : ''
+            }
+            ${act.report&&act.report.file_url
+              ? `<a href="${act.report.file_url}" target="_blank"
+                  style="display:inline-flex;align-items:center;gap:6px;background:#4a3fa0;color:#fff;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;text-decoration:none;margin-bottom:8px">
+                  📥 보고서 원문 보기
+                </a>`
+              : ''
+            }
+            ${act.report&&act.report.status
+              ? `<div style="font-size:11px;color:#999890;text-align:right">
+                  상태: <span style="color:${act.report.status==='완료'?'#2d7a3a':act.report.status==='진행중'?'#b06000':'#999890'};font-weight:600">${act.report.status}</span>
+                </div>`
+              : ''
+            }
+          </div>
           ${act.keywords&&act.keywords.length?`
           <div style="display:flex;flex-wrap:wrap;gap:5px">
             ${act.keywords.map(k=>`<span style="font-size:11px;background:#dbeeff;color:#1060b0;border-radius:10px;padding:2px 8px">#${k}</span>`).join('')}
@@ -685,7 +731,53 @@ function renderDreamCard(stu){
             <div style="font-size:13px;font-weight:700;color:#1a1a18;margin-bottom:4px">${act.dream}</div>
             ${act.dream_desc?`<div style="font-size:12px;color:#555;line-height:1.6">${act.dream_desc}</div>`:''}
           </div>`:''}
-          <p style="font-size:13px;color:#444340;line-height:1.7;margin-bottom:10px">${act.summary}</p>
+          <!-- 계획서/보고서 탭 -->
+          <div style="display:flex;gap:0;margin-bottom:10px;border-bottom:2px solid #e8e7e0">
+            <button onclick="switchDreamTab(this,'tab-plan-${idx}')"
+              id="btn-plan-${idx}"
+              style="padding:7px 16px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#4a3fa0;border-bottom:2px solid #4a3fa0;margin-bottom:-2px">
+              📋 계획서
+            </button>
+            <button onclick="switchDreamTab(this,'tab-report-${idx}')"
+              id="btn-report-${idx}"
+              style="padding:7px 16px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#999890;border-bottom:2px solid transparent;margin-bottom:-2px">
+              📄 보고서 ${act.report&&act.report.status==='완료'?'✅':''}
+            </button>
+          </div>
+          <!-- 계획서 탭 내용 -->
+          <div id="tab-plan-${idx}">
+            <p style="font-size:13px;color:#444340;line-height:1.7;margin-bottom:10px">${act.summary}</p>
+          </div>
+          <!-- 보고서 탭 내용 -->
+          <div id="tab-report-${idx}" style="display:none">
+            ${act.report&&act.report.result_summary
+              ? `<div style="margin-bottom:10px">
+                  <div style="font-size:11px;color:#4a3fa0;font-weight:700;margin-bottom:4px">🔬 탐구 결과</div>
+                  <p style="font-size:13px;color:#444340;line-height:1.7">${act.report.result_summary}</p>
+                </div>`
+              : '<p style="font-size:13px;color:#aaa9a0;text-align:center;padding:20px 0">보고서가 아직 등록되지 않았습니다<br><span style="font-size:11px">탐구 완료 후 업데이트 예정</span></p>'
+            }
+            ${act.report&&act.report.conclusion
+              ? `<div style="background:#f0efff;border-radius:8px;padding:10px 12px;margin-bottom:10px">
+                  <div style="font-size:11px;color:#4a3fa0;font-weight:700;margin-bottom:4px">💡 결론 및 소감</div>
+                  <p style="font-size:13px;color:#444340;line-height:1.6">${act.report.conclusion}</p>
+                </div>`
+              : ''
+            }
+            ${act.report&&act.report.file_url
+              ? `<a href="${act.report.file_url}" target="_blank"
+                  style="display:inline-flex;align-items:center;gap:6px;background:#4a3fa0;color:#fff;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;text-decoration:none;margin-bottom:8px">
+                  📥 보고서 원문 보기
+                </a>`
+              : ''
+            }
+            ${act.report&&act.report.status
+              ? `<div style="font-size:11px;color:#999890;text-align:right">
+                  상태: <span style="color:${act.report.status==='완료'?'#2d7a3a':act.report.status==='진행중'?'#b06000':'#999890'};font-weight:600">${act.report.status}</span>
+                </div>`
+              : ''
+            }
+          </div>
           ${act.book?`<div style="background:#fff3d6;border-radius:8px;padding:10px 12px;margin-bottom:10px">
             <div style="font-size:11px;color:#9a6200;font-weight:700;margin-bottom:4px">📖 선택 도서</div>
             <div style="font-size:13px;font-weight:600;color:#1a1a18;margin-bottom:4px">${act.book}</div>
@@ -852,6 +944,26 @@ function renderCard(stu){
       <div class="sw sw-e"><div class="sw-t">집중 보완 필요 (E·D)</div><div class="tags">${weak||'<span style="font-size:11px;color:#666">해당 없음</span>'}</div></div>
     </div>
   </div>`;
+}
+
+// 드림포스터 계획서/보고서 탭 전환
+function switchDreamTab(btn, targetId) {
+  const card = btn.closest('.act-body') || btn.closest('[id^="tab-"]')?.parentElement;
+  const container = btn.parentElement.parentElement;
+  // 모든 탭 버튼 비활성화
+  btn.parentElement.querySelectorAll('button').forEach(b => {
+    b.style.color = '#999890';
+    b.style.borderBottomColor = 'transparent';
+  });
+  // 모든 탭 내용 숨기기
+  container.querySelectorAll('[id^="tab-plan-"], [id^="tab-report-"]').forEach(el => {
+    el.style.display = 'none';
+  });
+  // 선택된 탭 활성화
+  btn.style.color = '#4a3fa0';
+  btn.style.borderBottomColor = '#4a3fa0';
+  const target = container.querySelector('#' + targetId);
+  if (target) target.style.display = '';
 }
 </script>
 </body>
