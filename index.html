@@ -1085,7 +1085,7 @@ function renderSciCard(stu) {
         <button onclick="toggleClubAct(this)" style="width:100%;background:#f0f8f0;border:none;cursor:pointer;padding:12px 16px;display:flex;align-items:flex-start;gap:8px;text-align:left">
           <span style="font-size:11px;background:#c8ead0;color:#1a5a2a;border-radius:5px;padding:2px 8px;font-weight:600;flex-shrink:0;margin-top:1px">🔬 탐구</span>
           <div style="flex:1;min-width:0">
-            <div style="font-size:13px;font-weight:600;color:#1a1a18;line-height:1.4">${d.문제인식 ? d.문제인식.slice(0,50)+(d.문제인식.length>50?'…':'') : '과학탐구실험'}</div>
+            <div style="font-size:13px;font-weight:600;color:#1a1a18;line-height:1.4">${d.주제 || (d.문제인식 ? d.문제인식.slice(0,50)+(d.문제인식.length>50?'…':'') : '과학탐구실험')}</div>
             ${previewHtml}
           </div>
           <span class="act-arrow" style="font-size:12px;color:#999890;flex-shrink:0;transition:transform .2s;margin-top:2px">▼</span>
