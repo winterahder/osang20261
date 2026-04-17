@@ -254,7 +254,8 @@ async function loadStuInfo(){
         _cls:cls,
         _num:num,
         avgPct:parts[5]?parts[5].trim():'',
-        pctRank:parts[6]?parts[6].trim():''
+        pctRank:parts[6]?parts[6].trim():'',
+        club:parts[7]?parts[7].trim():''
       };
     });
     console.log(`학생 정보 ${Object.keys(stuInfo).length}명 로드 완료`);
@@ -303,6 +304,12 @@ const MOCK_ITEMS=[
   {key:'sep',label:'9월'},
   {key:'nov',label:'11월'},
 ];
+/* ── 비교과 항목 ── */
+const EXTRA_ITEMS=[
+  {key:'club',label:'동아리'},
+  {key:'dream',label:'드림포스터'},
+  {key:'study',label:'학력증진프로그램'},
+];
 
 function selClass(cls){
   curCls=cls; curStu=null; curStuData=null; curCategory=null; curExam=null; curMockKey=null;
@@ -339,7 +346,7 @@ function selClass(cls){
   // 오른쪽 항목 선택 패널 초기화
   document.getElementById('navLabel').textContent='항목 선택';
   document.getElementById('navBtns').innerHTML=
-    ['내신','모의고사'].map(cat=>
+    ['내신','모의고사','비교과'].map(cat=>
       `<button class="cb" onclick="selCategory('${cat}')">${cat}</button>`
     ).join('');
   document.getElementById('navGradeWrap').style.display='none';
@@ -372,7 +379,7 @@ function selGrade(grade){
   curGrade=grade; curExam=null;
   document.querySelectorAll('#navGradeBtns .cb').forEach(b=>b.classList.toggle('on',b.textContent===grade));
 
-  const items = curCategory==='내신' ? NAESIN_ITEMS : MOCK_ITEMS;
+  const items = curCategory==='내신' ? NAESIN_ITEMS : curCategory==='모의고사' ? MOCK_ITEMS : EXTRA_ITEMS;
   const isNaesin = curCategory==='내신';
   document.getElementById('navSubBtnsWrap').style.display='block';
   document.getElementById('navSubBtns').innerHTML= isNaesin
@@ -394,7 +401,28 @@ async function selExam(key,label){
   // 모의고사 데이터 파일 키 계산
   const fileMap={'mar':'mock_mar','jun':'mock_jun','sep':'mock_sep','nov':'mock_nov'};
   const isMock = curCategory==='모의고사' && curGrade==='1학년';
+  const isExtra = curCategory==='비교과';
   const fileKey = isMock ? fileMap[key] : null;
+
+  // 비교과 처리
+  if(isExtra){
+    if(key==='club'){
+      // 동아리: 학생 카드에 이미 표시됨 → 현재 선택 학생 카드 보여주기
+      curMockKey='club';
+      const stuList=document.querySelector('#stuGrid .stu-list');
+      if(stuList) stuList.querySelectorAll('.sli').forEach(btn=>{btn.disabled=false;btn.style.opacity='';btn.style.cursor='';});
+      if(curStu!==null && curStuData){
+        renderCard(curStuData);
+        document.getElementById('cardArea').scrollIntoView({behavior:'smooth',block:'nearest'});
+      } else {
+        document.getElementById('cardArea').innerHTML='<div class="detail-card"><div class="ph">이름을 클릭하면 동아리 정보가 표시됩니다</div></div>';
+      }
+    } else {
+      curMockKey=null;
+      document.getElementById('cardArea').innerHTML='<div class="detail-card"><div class="ph" style="color:#c0bfb5">📋 '+label+' 데이터는 아직 준비 중입니다</div></div>';
+    }
+    return;
+  }
 
   if(fileKey){
     document.getElementById('cardArea').innerHTML='<div class="detail-card"><div class="ph">⏳ 데이터 불러오는 중...</div></div>';
@@ -429,9 +457,11 @@ async function selExam(key,label){
 /* 학생 + 항목 둘 다 선택됐을 때 카드 렌더 */
 function tryShowCard(){
   if(curMockKey && curStuData){
-    // ALL에서 현재 학생 데이터 최신화
-    const fresh=ALL[curCls]&&ALL[curCls].find(s=>s.n===curStuData.n);
-    if(fresh){ curStuData=fresh; }
+    if(curMockKey!=='club'){
+      // 모의고사: ALL에서 학생 데이터 최신화
+      const fresh=ALL[curCls]&&ALL[curCls].find(s=>s.n===curStuData.n);
+      if(fresh){ curStuData=fresh; }
+    }
     renderCard(curStuData);
     document.getElementById('cardArea').scrollIntoView({behavior:'smooth',block:'nearest'});
   }
@@ -556,7 +586,7 @@ function renderCard(stu){
   const hakbun='1'+String(curCls).padStart(2,'0')+String(stu.n).padStart(2,'0');
   const info=stuInfo[hakbun]||{};
   const pSrc=`photos/${curCls}반/${hakbun}.jpg`;
-  _printHtml=`<div class="detail-card"><div class="card-hd"><img src="${pSrc}" style="width:54px;height:72px;border-radius:6px;object-fit:cover;object-position:top;flex-shrink:0;border:1px solid #e8e7e0" onerror="if(this.src.endsWith('.jpg')){this.src=this.src.replace('.jpg','.jpeg')}else if(this.src.endsWith('.jpeg')){this.src=this.src.replace('.jpeg','.png')}else{this.style.display='none'}"><div style="flex:1"><div style="font-size:16px;font-weight:700;color:#1a1a18">${stu.nm} <span style="font-weight:500;font-size:12px;color:#999890">${curCls}반 ${stu.n}번</span></div><div style="font-size:11px;color:#999890;margin-top:2px">2026년 3월 전국연합학력평가</div>${info.school?`<div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap"><span style="font-size:10px;color:#555450;background:#f5f4ee;border-radius:5px;padding:2px 6px;font-weight:500">🏫 ${info.school}</span><span style="font-size:10px;color:#555450;background:#f5f4ee;border-radius:5px;padding:2px 6px;font-weight:500">📋 내신 ${info.score}</span></div>`:''}</div><div style="display:flex;flex-direction:column;gap:4px"><div style="display:flex;gap:6px"><div style="background:#f5f4ee;border-radius:8px;padding:5px 10px;text-align:center"><div style="font-size:9px;color:#999890">등급 평균</div><div style="font-size:15px;font-weight:800;color:#1a1a18">${sc.avg||'-'}</div></div><div style="background:#f5f4ee;border-radius:8px;padding:5px 10px;text-align:center"><div style="font-size:9px;color:#999890">교내 석차</div><div style="font-size:15px;font-weight:800;color:#1a1a18">${sc.rank?sc.rank+'위':'-'}</div></div></div>${info.pctRank?`<div style="display:flex;gap:6px"><div style="background:#dbeeff;border-radius:8px;padding:5px 10px;text-align:center"><div style="font-size:9px;color:#1060b0;font-weight:600">평균백분위</div><div style="font-size:14px;font-weight:800;color:#1060b0">${info.avgPct}</div></div><div style="background:#dbeeff;border-radius:8px;padding:5px 10px;text-align:center"><div style="font-size:9px;color:#1060b0;font-weight:600">백분위석차</div><div style="font-size:15px;font-weight:800;color:#1060b0">${info.pctRank}위</div></div></div>`:''}</div></div><div class="sum-row">${sumHtml}</div><div class="div-line"></div><div class="sec-title">문항별 영역 분석</div><div class="leg"><span class="li"><span class="ld" style="background:#0b8a5e"></span>S 90%+</span><span class="li"><span class="ld" style="background:#1060b0"></span>A 80~89%</span><span class="li"><span class="ld" style="background:#4a3fa0"></span>B 70~79%</span><span class="li"><span class="ld" style="background:#888780"></span>C 55~69%</span><span class="li"><span class="ld" style="background:#c08000"></span>D 40~54%</span><span class="li"><span class="ld" style="background:#b02020"></span>E ~39%</span></div>${subjHtml}<div class="sw-row"><div class="sw sw-s"><div class="sw-t">강점 영역 (S·A)</div><div class="tags">${strong||'<span style="font-size:11px;color:#666">해당 없음</span>'}</div></div><div class="sw sw-e"><div class="sw-t">집중 보완 필요 (E·D)</div><div class="tags">${weak||'<span style="font-size:11px;color:#666">해당 없음</span>'}</div></div></div></div>`;
+  _printHtml=`<div class="detail-card"><div class="card-hd"><img src="${pSrc}" style="width:54px;height:72px;border-radius:6px;object-fit:cover;object-position:top;flex-shrink:0;border:1px solid #e8e7e0" onerror="if(this.src.endsWith('.jpg')){this.src=this.src.replace('.jpg','.jpeg')}else if(this.src.endsWith('.jpeg')){this.src=this.src.replace('.jpeg','.png')}else{this.style.display='none'}"><div style="flex:1"><div style="font-size:16px;font-weight:700;color:#1a1a18">${stu.nm} <span style="font-weight:500;font-size:12px;color:#999890">${curCls}반 ${stu.n}번</span></div><div style="font-size:11px;color:#999890;margin-top:2px">2026년 3월 전국연합학력평가</div>${info.school?`<div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap"><span style="font-size:10px;color:#555450;background:#f5f4ee;border-radius:5px;padding:2px 6px;font-weight:500">🏫 ${info.school}</span><span style="font-size:10px;color:#555450;background:#f5f4ee;border-radius:5px;padding:2px 6px;font-weight:500">📋 내신 ${info.score}</span>${info.club?`<span style="font-size:10px;color:#0b6e4f;background:#dff4ec;border-radius:5px;padding:2px 6px;font-weight:500">🎯 ${info.club}</span>`:''}</div>`:''}</div><div style="display:flex;flex-direction:column;gap:4px"><div style="display:flex;gap:6px"><div style="background:#f5f4ee;border-radius:8px;padding:5px 10px;text-align:center"><div style="font-size:9px;color:#999890">등급 평균</div><div style="font-size:15px;font-weight:800;color:#1a1a18">${sc.avg||'-'}</div></div><div style="background:#f5f4ee;border-radius:8px;padding:5px 10px;text-align:center"><div style="font-size:9px;color:#999890">교내 석차</div><div style="font-size:15px;font-weight:800;color:#1a1a18">${sc.rank?sc.rank+'위':'-'}</div></div></div>${info.pctRank?`<div style="display:flex;gap:6px"><div style="background:#dbeeff;border-radius:8px;padding:5px 10px;text-align:center"><div style="font-size:9px;color:#1060b0;font-weight:600">평균백분위</div><div style="font-size:14px;font-weight:800;color:#1060b0">${info.avgPct}</div></div><div style="background:#dbeeff;border-radius:8px;padding:5px 10px;text-align:center"><div style="font-size:9px;color:#1060b0;font-weight:600">백분위석차</div><div style="font-size:15px;font-weight:800;color:#1060b0">${info.pctRank}위</div></div></div>`:''}</div></div><div class="sum-row">${sumHtml}</div><div class="div-line"></div><div class="sec-title">문항별 영역 분석</div><div class="leg"><span class="li"><span class="ld" style="background:#0b8a5e"></span>S 90%+</span><span class="li"><span class="ld" style="background:#1060b0"></span>A 80~89%</span><span class="li"><span class="ld" style="background:#4a3fa0"></span>B 70~79%</span><span class="li"><span class="ld" style="background:#888780"></span>C 55~69%</span><span class="li"><span class="ld" style="background:#c08000"></span>D 40~54%</span><span class="li"><span class="ld" style="background:#b02020"></span>E ~39%</span></div>${subjHtml}<div class="sw-row"><div class="sw sw-s"><div class="sw-t">강점 영역 (S·A)</div><div class="tags">${strong||'<span style="font-size:11px;color:#666">해당 없음</span>'}</div></div><div class="sw sw-e"><div class="sw-t">집중 보완 필요 (E·D)</div><div class="tags">${weak||'<span style="font-size:11px;color:#666">해당 없음</span>'}</div></div></div></div>`;
   document.getElementById('cardArea').innerHTML=`
   <div class="detail-card">
     <div style="display:flex;gap:16px;margin-bottom:14px;align-items:flex-start">
@@ -594,6 +624,7 @@ function renderCard(stu){
             ${info.school?`<div style="display:flex;gap:8px;margin-top:5px;align-items:center;flex-wrap:wrap">
               <span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#555450;background:#f5f4ee;border-radius:6px;padding:3px 8px;font-weight:500">🏫 ${info.school}</span>
               <span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#555450;background:#f5f4ee;border-radius:6px;padding:3px 8px;font-weight:500">📋 내신 ${info.score}</span>
+              ${info.club?`<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#0b6e4f;background:#dff4ec;border-radius:6px;padding:3px 8px;font-weight:500">🎯 ${info.club}</span>`:''}
             </div>`:''}
           </div>
           <button class="print-btn" onclick="printCard()" style="margin-left:10px;flex-shrink:0">
