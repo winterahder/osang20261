@@ -484,7 +484,13 @@ function pick(n){
   if(curStu!==null){const p=document.getElementById('sb'+curStu);if(p)p.classList.remove('on');}
   curStu=n;
   document.getElementById('sb'+n).classList.add('on');
-  const stu=(ALL[curCls]&&ALL[curCls].find(s=>s.n===n))||null;
+  // ALL에서 먼저 찾고, 없으면 stuInfo로 기본 객체 생성 (비교과 모드 등)
+  let stu=(ALL[curCls]&&ALL[curCls].find(s=>s.n===n))||null;
+  if(!stu){
+    const hakbun='1'+String(curCls).padStart(2,'0')+String(n).padStart(2,'0');
+    const si=stuInfo[hakbun];
+    if(si) stu={n:n, nm:si._name, sc:{}, s:{}};
+  }
   curStuData=stu;
   // 항목(카테고리+세부)까지 선택된 경우에만 카드 표시
   if(stu && curExam){
