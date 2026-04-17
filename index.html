@@ -1001,37 +1001,49 @@ function renderSciCard(stu) {
   const d = sciData[hakbun];
 
   // 데이터 없는 경우
-  const noData = `
-    <div class="detail-card">
-      <div style="display:flex;gap:16px;align-items:center;margin-bottom:16px">
-        <img src="${pSrc}" style="width:72px;height:96px;border-radius:8px;object-fit:cover;object-position:top;border:1px solid #e8e7e0;flex-shrink:0"
-          onerror="if(this.src.endsWith('.jpg')){this.src=this.src.replace('.jpg','.jpeg')}else if(this.src.endsWith('.jpeg')){this.src=this.src.replace('.jpeg','.png')}else{this.style.display='none'}">
-        <div>
-          <div style="font-size:20px;font-weight:700;color:#1a1a18">${stu.nm}
-            <span style="font-size:14px;color:#999890;font-weight:500">${curCls}반 ${stu.n}번</span>
+  if (!d) {
+    document.getElementById('cardArea').innerHTML = `
+      <div class="detail-card">
+        <div style="display:flex;gap:16px;margin-bottom:16px;align-items:flex-start">
+          <div style="flex-shrink:0">
+            <img
+                id="stuPhotoImg_${hakbun}"
+                src="${pSrc}"
+                style="width:108px;height:144px;border-radius:8px;object-fit:cover;object-position:top;border:1px solid #e8e7e0;display:block"
+                onerror="if(this.src.endsWith('.jpg')){this.src=this.src.replace('.jpg','.jpeg')}else if(this.src.endsWith('.jpeg')){this.src=this.src.replace('.jpeg','.png')}else{this.outerHTML='<div style=\\'width:108px;height:144px;border-radius:8px;background:#e8f4e8;display:flex;align-items:center;justify-content:center;font-size:42px;font-weight:700;color:#1a6a1a\\'>${stu.nm[0]}</div>'}"
+              >
           </div>
-          ${info.school ? '<div style="font-size:13px;color:#666;margin-top:4px">🏠 ' + info.school + '</div>' : ''}
+          <div style="flex:1;min-width:0">
+            <div style="font-size:20px;font-weight:700;color:#1a1a18;margin-bottom:4px">
+              ${stu.nm} <span style="font-weight:500;font-size:14px;color:#999890">${curCls}반 ${stu.n}번</span>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:8px">
+              ${info.school?`<span style="font-size:12px;color:#555450;background:#f5f4ee;border-radius:6px;padding:3px 8px;font-weight:500">🏫 ${info.school}</span>`:''}
+              ${info.score?`<span style="font-size:12px;color:#555450;background:#f5f4ee;border-radius:6px;padding:3px 8px;font-weight:500">📋 내신 ${info.score}</span>`:''}
+              ${info.club?`<span style="font-size:12px;color:#0b6e4f;background:#dff4ec;border-radius:6px;padding:3px 8px;font-weight:600">🎯 ${info.club}</span>`:''}
+            </div>
+          </div>
         </div>
-      </div>
-      <div style="text-align:center;color:#aaa9a0;padding:30px 0;font-size:14px">
-        📋 과학탐구실험 보고서가 등록되지 않았습니다
-      </div>
-    </div>`;
+        <div class="div-line"></div>
+        <div style="text-align:center;color:#aaa9a0;padding:30px 0;font-size:14px">
+          📋 과학탐구실험 보고서가 등록되지 않았습니다
+        </div>
+      </div>`;
+    return;
+  }
 
-  if (!d) { document.getElementById('cardArea').innerHTML = noData; return; }
-
-  // 미리보기: 가설 + 결론 한 줄 요약
+  // 미리보기: 가설 + 결론 한 줄
   const previewHtml = `
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
       ${d.가설설정 ? '<span style="font-size:11px;background:#fff8e8;color:#7a5a00;border-radius:5px;padding:2px 8px;font-weight:600">💡 ' + d.가설설정.slice(0,30) + (d.가설설정.length>30?'…':'') + '</span>' : ''}
       ${d.결론도출 ? '<span style="font-size:11px;background:#f0fff0;color:#1a5a2a;border-radius:5px;padding:2px 8px;font-weight:600">✅ ' + d.결론도출.slice(0,30) + (d.결론도출.length>30?'…':'') + '</span>' : ''}
     </div>`;
 
-  // 펼쳤을 때: 세특 중심 + 상세 항목
+  // 상세 항목
   const detailSections = [
-    {key:'문제인식',       label:'🔍 문제 인식',          color:'#e8f4ff', border:'#b0d4f0', text:'#1a4a7a'},
-    {key:'탐구설계및수행', label:'🔬 탐구 설계 및 수행',  color:'#f0fff0', border:'#90d4a0', text:'#1a5a2a'},
-    {key:'결과분석',       label:'📊 결과 분석',          color:'#f5f0ff', border:'#c0a0e8', text:'#4a2a7a'},
+    {key:'문제인식',         label:'🔍 문제 인식',          color:'#e8f4ff', border:'#b0d4f0', text:'#1a4a7a'},
+    {key:'탐구설계및수행',   label:'🔬 탐구 설계 및 수행',  color:'#f0fff0', border:'#90d4a0', text:'#1a5a2a'},
+    {key:'결과분석',         label:'📊 결과 분석',          color:'#f5f0ff', border:'#c0a0e8', text:'#4a2a7a'},
     {key:'느낀점및추가탐구', label:'💬 느낀점 및 추가 탐구', color:'#f0f8f0', border:'#a0c8a0', text:'#1a4a1a'},
   ];
 
@@ -1041,25 +1053,35 @@ function renderSciCard(stu) {
       <div style="padding:8px 12px;font-size:12px;color:#444;line-height:1.7;white-space:pre-wrap;background:#fff">${d[s.key]}</div>
     </div>` : '').join('');
 
-  // 카드 구성
   document.getElementById('cardArea').innerHTML = `
     <div class="detail-card">
-      <div style="display:flex;gap:16px;align-items:center;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #e8e7e0">
-        <img src="${pSrc}" style="width:72px;height:96px;border-radius:8px;object-fit:cover;object-position:top;border:1px solid #e8e7e0;flex-shrink:0"
-          onerror="if(this.src.endsWith('.jpg')){this.src=this.src.replace('.jpg','.jpeg')}else if(this.src.endsWith('.jpeg')){this.src=this.src.replace('.jpeg','.png')}else{this.style.display='none'}">
+      <!-- ── 헤더: 동아리 카드와 동일한 구조 ── -->
+      <div style="display:flex;gap:16px;margin-bottom:16px;align-items:flex-start">
+        <div style="flex-shrink:0">
+          <img
+              id="stuPhotoImg_${hakbun}"
+              src="${pSrc}"
+              style="width:108px;height:144px;border-radius:8px;object-fit:cover;object-position:top;border:1px solid #e8e7e0;display:block"
+              onerror="if(this.src.endsWith('.jpg')){this.src=this.src.replace('.jpg','.jpeg')}else if(this.src.endsWith('.jpeg')){this.src=this.src.replace('.jpeg','.png')}else{this.outerHTML='<div style=\\'width:108px;height:144px;border-radius:8px;background:#e8f4e8;display:flex;align-items:center;justify-content:center;font-size:42px;font-weight:700;color:#1a6a1a\\'>${stu.nm[0]}</div>'}"
+            >
+        </div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:20px;font-weight:700;color:#1a1a18">${stu.nm}
-            <span style="font-size:14px;color:#999890;font-weight:500">${curCls}반 ${stu.n}번</span>
+          <div style="font-size:20px;font-weight:700;color:#1a1a18;margin-bottom:4px">
+            ${stu.nm} <span style="font-weight:500;font-size:14px;color:#999890">${curCls}반 ${stu.n}번</span>
           </div>
-          ${info.school ? '<div style="font-size:13px;color:#666;margin-top:2px">🏠 ' + info.school + '</div>' : ''}
-          <div style="margin-top:4px">
-            <span style="font-size:11px;background:#e8f4e8;color:#1a6a1a;border-radius:5px;padding:2px 8px;font-weight:600">🔬 과학탐구실험1 · 연역적 탐구</span>
+          <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:8px">
+            ${info.school?`<span style="font-size:12px;color:#555450;background:#f5f4ee;border-radius:6px;padding:3px 8px;font-weight:500">🏫 ${info.school}</span>`:''}
+            ${info.score?`<span style="font-size:12px;color:#555450;background:#f5f4ee;border-radius:6px;padding:3px 8px;font-weight:500">📋 내신 ${info.score}</span>`:''}
+            ${info.club?`<span style="font-size:12px;color:#0b6e4f;background:#dff4ec;border-radius:6px;padding:3px 8px;font-weight:600">🎯 ${info.club}</span>`:''}
+            <span style="font-size:12px;color:#1a6a1a;background:#e8f4e8;border-radius:6px;padding:3px 8px;font-weight:600">🔬 과학탐구실험</span>
           </div>
         </div>
       </div>
+      <div class="div-line"></div>
+      <div class="sec-title">과학탐구실험 활동 기록</div>
 
       <!-- 접힘/펼침 카드 -->
-      <div style="border:0.5px solid #dddcd4;border-radius:10px;overflow:hidden">
+      <div style="border:0.5px solid #dddcd4;border-radius:10px;margin-bottom:8px;overflow:hidden">
         <button onclick="toggleClubAct(this)" style="width:100%;background:#f0f8f0;border:none;cursor:pointer;padding:12px 16px;display:flex;align-items:flex-start;gap:8px;text-align:left">
           <span style="font-size:11px;background:#c8ead0;color:#1a5a2a;border-radius:5px;padding:2px 8px;font-weight:600;flex-shrink:0;margin-top:1px">🔬 탐구</span>
           <div style="flex:1;min-width:0">
@@ -1070,18 +1092,13 @@ function renderSciCard(stu) {
         </button>
         <div class="act-body" style="display:none;padding:14px 16px;background:#fff">
 
-          <!-- 세특 섹션 (최상단 강조) -->
+          <!-- 세특 (최상단 강조) -->
           ${d.세특 ? `
           <div style="background:linear-gradient(135deg,#e8f4e8,#f0fff0);border-radius:10px;padding:12px 14px;margin-bottom:14px;border:1px solid #90d4a0">
             <div style="font-size:11px;color:#1a5a2a;font-weight:700;margin-bottom:6px">📝 세부능력 및 특기사항</div>
             <div style="font-size:13px;color:#1a1a18;line-height:1.8">${d.세특}</div>
-            <div style="font-size:10px;color:#aaa;margin-top:6px;text-align:right">${d.세특.length}자 / ${new TextEncoder().encode(d.세특).length}바이트</div>
+            <div style="font-size:10px;color:#aaa;margin-top:6px;text-align:right">${d.세특.length}자</div>
           </div>` : ''}
-
-          <!-- 구분선 -->
-          <div style="border-top:1px dashed #e0e0d8;margin-bottom:12px;padding-top:4px">
-            <span style="font-size:10px;color:#bbb;background:#fff;padding:0 8px;position:relative;top:-10px">탐구 상세 내용</span>
-          </div>
 
           <!-- 가설·결론 요약 -->
           <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
@@ -1095,6 +1112,10 @@ function renderSciCard(stu) {
             </div>` : ''}
           </div>
 
+          <!-- 탐구 상세 -->
+          <div style="border-top:1px dashed #e0e0d8;margin-bottom:12px;padding-top:8px">
+            <span style="font-size:10px;color:#bbb">탐구 상세 내용</span>
+          </div>
           ${sectHtml}
         </div>
       </div>
