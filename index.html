@@ -1092,22 +1092,33 @@ async function loadAdmData() {
 }
 
 // 학생 3월 모의 점수 가져오기
-function getStuMockScore() {
+async function getStuMockScore() {
   if (!curStu || !curCls) return null;
-  const hakbun = '1' + String(curCls).padStart(2,'0') + String(curStu).toString().padStart(2,'0');
-  // mock_mar 데이터에서 학생 찾기
-  if (!ALL[curCls]) return null;
-  const stu = ALL[curCls].find(s => s.n === curStu);
+
+  // 1) 이미 로딩된 ALL에서 먼저 찾기
+  let stu = ALL[String(curCls)]?.find(s => s.n === curStu);
+
+  // 2) ALL에 없으면 mock_mar.json 직접 로드
+  if (!stu || !stu.sc) {
+    const marData = await loadMockData('mock_mar');
+    if (!marData || !marData.ALL) return null;
+    const clsData = marData.ALL[String(curCls)];
+    if (!clsData) return null;
+    stu = clsData.find(s => s.n === curStu);
+  }
+
   if (!stu || !stu.sc) return null;
+  const sc = stu.sc;
+
   return {
-    국어백분위: stu.sc.kor?.pct || null,
-    수학백분위: stu.sc.mat?.pct || null,
-    영어등급: stu.sc.eng?.gr || null,
-    한국사등급: stu.sc.hst?.gr || null,
-    탐구1백분위: stu.sc.sci?.pct || stu.sc.soc?.pct || null,
+    국어백분위: sc.kor?.pct ? parseFloat(sc.kor.pct) : null,
+    수학백분위: sc.mat?.pct ? parseFloat(sc.mat.pct) : null,
+    영어등급: sc.eng?.gr ? parseInt(sc.eng.gr) : null,
+    한국사등급: sc.hst?.gr ? parseInt(sc.hst.gr) : null,
+    탐구1백분위: sc.sci?.pct ? parseFloat(sc.sci.pct) : (sc.soc?.pct ? parseFloat(sc.soc.pct) : null),
     탐구2백분위: null,
-    국어표준: stu.sc.kor?.std || null,
-    수학표준: stu.sc.mat?.std || null,
+    국어표준: sc.kor?.std ? parseFloat(sc.kor.std) : null,
+    수학표준: sc.mat?.std ? parseFloat(sc.mat.std) : null,
   };
 }
 
@@ -1243,7 +1254,7 @@ async function renderAdmissionUI() {
     return;
   }
 
-  const mockScore = getStuMockScore();
+  const mockScore = await getStuMockScore();
   const stuName = curStu && curCls ? 
     (ALL[curCls]?.find(s => s.n === curStu)?.nm || `${curCls}반 ${curStu}번`) : null;
 
