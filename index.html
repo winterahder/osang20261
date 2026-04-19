@@ -1073,22 +1073,42 @@ function renderSciCard(stu) {
 let admData = null;
 let admLoading = false;
 
+let cutlineData = null;
+
 async function loadAdmData() {
   if (admData) return admData;
   if (admLoading) return null;
   admLoading = true;
   try {
-    const resp = await fetch('data/admission_2027.json');
-    if (!resp.ok) return null;
-    const d = await resp.json();
-    admData = d;
+    const [admResp, cutResp] = await Promise.all([
+      fetch('data/admission_2027.json'),
+      fetch('data/cutline_2025_gyeongbuk.json')
+    ]);
+    if (!admResp.ok) return null;
+    admData = await admResp.json();
+    if (cutResp.ok) {
+      const cutData = await cutResp.json();
+      // 빠른 검색을 위해 인덱싱
+      cutlineData = {};
+      cutData.cutlines.forEach(c => {
+        const key = c.대학 + '||' + c.학과 + '||' + c.군;
+        cutlineData[key] = c;
+      });
+    }
     admLoading = false;
-    return d;
+    return admData;
   } catch(e) {
     admLoading = false;
-    console.log('admission_2027.json 로드 실패:', e);
+    console.log('입시 데이터 로드 실패:', e);
     return null;
   }
+}
+
+// 입결 데이터로 커트라인 조회
+function getCutline(univ, dept, gun) {
+  if (!cutlineData) return null;
+  const key = univ + '||' + dept + '||' + gun;
+  return cutlineData[key] || null;
 }
 
 // 학생 3월 모의 점수 가져오기
@@ -1197,50 +1217,72 @@ function calcScore(school, scores, subjectOpt) {
   return Math.round(score * 10) / 10;
 }
 
-// 합격 가능성 분류 (백분위 기반 러프 추정)
-function classifyChance(scores, school) {
+// 합격 가능성 분류
+function classifyChance(scores, school, subjectOpt) {
   const K = admData.keys;
-  const scoreType = school[K.indexOf('수능활용점수')] || '';
-  
-  // 학생 대표 백분위 계산 (반영 과목 기준)
+  const 대학 = school[K.indexOf('대학')];
+  const 학과 = school[K.indexOf('학과')];
+  const 군 = school[K.indexOf('군')];
+  const 지역 = school[K.indexOf('지역')];
+  const 전형총점 = school[K.indexOf('전형총점')] || 1000;
+
+  // 학생 환산점수 계산
+  const stuScore = calcScore(school, scores, subjectOpt);
+
+  // ── 실제 입결 데이터 기반 분류 ──
+  const cut = getCutline(대학, 학과, 군);
+  if (cut && cut.컷 !== null && stuScore !== null) {
+    // 총점 기준으로 정규화하여 비교
+    const cutNorm = cut.컷 / cut.총점 * 전형총점;
+    const diff = stuScore - cutNorm;
+    const pctDiff = (diff / 전형총점) * 100;
+
+    let source = `📊 2025 입결(70%컷) 기준`;
+    if (cut.단위 === '등급') {
+      // 위덕대: 등급 기준 (낮을수록 좋음)
+      const engGr = scores.영어등급 || 5;
+      const grDiff = cut.컷 - engGr;
+      if (grDiff >= 1.5) return {label:'매우 안정', color:'#0b8a5e', bg:'#d4f5e5', icon:'✅✅', source};
+      if (grDiff >= 0.5) return {label:'안정', color:'#1a6a3a', bg:'#e8f8f0', icon:'✅', source};
+      if (grDiff >= -0.5) return {label:'적정', color:'#1060b0', bg:'#dbeeff', icon:'🎯', source};
+      if (grDiff >= -1.5) return {label:'위험', color:'#c06000', bg:'#fff3e0', icon:'⚠️', source};
+      return {label:'매우 위험', color:'#b02020', bg:'#ffe8e8', icon:'❌', source};
+    }
+    if (pctDiff >= 3) return {label:'매우 안정', color:'#0b8a5e', bg:'#d4f5e5', icon:'✅✅', source};
+    if (pctDiff >= 1) return {label:'안정', color:'#1a6a3a', bg:'#e8f8f0', icon:'✅', source};
+    if (pctDiff >= -1) return {label:'적정', color:'#1060b0', bg:'#dbeeff', icon:'🎯', source};
+    if (pctDiff >= -3) return {label:'위험', color:'#c06000', bg:'#fff3e0', icon:'⚠️', source};
+    return {label:'매우 위험', color:'#b02020', bg:'#ffe8e8', icon:'❌', source};
+  }
+
+  // ── 입결 데이터 없는 경우: 백분위 기반 러프 추정 ──
   const 국어비율 = school[K.indexOf('국어비율')] || 0;
   const 수학비율 = school[K.indexOf('수학비율')] || 0;
   const 탐구비율 = school[K.indexOf('탐구비율')] || 0;
-
   let totalRatio = 국어비율 + 수학비율 + 탐구비율;
   if (totalRatio === 0) totalRatio = 100;
-
   let weightedPct = 0;
   if (국어비율 > 0 && scores.국어백분위) weightedPct += scores.국어백분위 * 국어비율 / totalRatio;
   if (수학비율 > 0 && scores.수학백분위) weightedPct += scores.수학백분위 * 수학비율 / totalRatio;
   if (탐구비율 > 0 && scores.탐구1백분위) weightedPct += scores.탐구1백분위 * 탐구비율 / totalRatio;
-
   if (weightedPct === 0) return null;
 
-  // 러프한 합격 가능성 분류 (1학년 3월 기준)
-  // ⚠️ 실제 입결 데이터 없이 백분위만으로 추정 — 참고용
-  const 지역 = school[K.indexOf('지역')];
-  const 대학 = school[K.indexOf('대학')];
-  
-  // 주요 대학 기준으로 커트라인 러프 추정
   const 서울상위 = ['서울대','연세대','고려대','성균관대','서강대','한양대','이화여대'];
   const 서울중상위 = ['중앙대','경희대','한국외대','서울시립대','건국대','동국대','숭실대','홍익대'];
   const 서울중위 = ['세종대','가톨릭대','국민대','명지대','서울과기대','덕성여대','동덕여대'];
-  
-  let cutPct = 60; // 기본값
+  let cutPct = 52;
   if (서울상위.includes(대학)) cutPct = 93;
   else if (서울중상위.includes(대학)) cutPct = 85;
   else if (서울중위.includes(대학)) cutPct = 75;
   else if (지역 === '서울') cutPct = 68;
   else if (['경기','인천'].includes(지역)) cutPct = 60;
-  else cutPct = 52;
-
   const diff = weightedPct - cutPct;
-  if (diff >= 5) return {label:'매우 안정', color:'#0b8a5e', bg:'#d4f5e5', icon:'✅✅'};
-  if (diff >= 2) return {label:'안정', color:'#1a6a3a', bg:'#e8f8f0', icon:'✅'};
-  if (diff >= -2) return {label:'적정', color:'#1060b0', bg:'#dbeeff', icon:'🎯'};
-  if (diff >= -5) return {label:'위험', color:'#c06000', bg:'#fff3e0', icon:'⚠️'};
-  return {label:'매우 위험', color:'#b02020', bg:'#ffe8e8', icon:'❌'};
+  const source = '📈 백분위 추정 (입결 미확보)';
+  if (diff >= 5) return {label:'매우 안정', color:'#0b8a5e', bg:'#d4f5e5', icon:'✅✅', source};
+  if (diff >= 2) return {label:'안정', color:'#1a6a3a', bg:'#e8f8f0', icon:'✅', source};
+  if (diff >= -2) return {label:'적정', color:'#1060b0', bg:'#dbeeff', icon:'🎯', source};
+  if (diff >= -5) return {label:'위험', color:'#c06000', bg:'#fff3e0', icon:'⚠️', source};
+  return {label:'매우 위험', color:'#b02020', bg:'#ffe8e8', icon:'❌', source};
 }
 
 // 모의지원 UI 렌더링
@@ -1436,7 +1478,7 @@ function runAdmSearch() {
 
   // 합격 가능성 계산 및 정렬
   const results = filtered.map(s => {
-    const chance = classifyChance(scores, s);
+    const chance = classifyChance(scores, s, subjectOpt);
     return { school: s, chance };
   }).filter(r => r.chance);
 
@@ -1458,9 +1500,10 @@ function runAdmSearch() {
         <td style="padding:8px 6px;font-size:11px;text-align:center">${s[K.indexOf('군')] || '-'}군</td>
         <td style="padding:8px 6px;font-size:11px;text-align:center">${s[K.indexOf('수능활용점수')] || '-'}</td>
         <td style="padding:8px 6px;text-align:center">
-          <span style="background:${ch.bg};color:${ch.color};border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;white-space:nowrap">
+          <div style="background:${ch.bg};color:${ch.color};border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;white-space:nowrap">
             ${ch.icon} ${ch.label}
-          </span>
+          </div>
+          <div style="font-size:9px;color:#aaa;margin-top:2px">${ch.source||''}</div>
         </td>
       </tr>`;
   }).join('');
