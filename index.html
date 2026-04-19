@@ -373,7 +373,7 @@ function selClass(cls){
   // 오른쪽 항목 선택 패널 초기화
   document.getElementById('navLabel').textContent='항목 선택';
   document.getElementById('navBtns').innerHTML=
-    ['내신','모의고사','비교과'].map(cat=>
+    ['내신','모의고사','비교과','모의지원'].map(cat=>
       `<button class="cb" onclick="selCategory('${cat}')">${cat}</button>`
     ).join('');
   document.getElementById('navGradeWrap').style.display='none';
