@@ -389,6 +389,13 @@ function selCategory(cat){
   curCategory=cat; curGrade=null; curExam=null;
   document.querySelectorAll('#navBtns .cb').forEach(b=>b.classList.toggle('on',b.textContent===cat));
 
+  if(cat==='모의지원'){
+    document.getElementById('navGradeWrap').style.display='none';
+    document.getElementById('navSubBtnsWrap').style.display='none';
+    renderAdmissionUI();
+    return;
+  }
+
   // 학년 버튼 표시
   document.getElementById('navGradeWrap').style.display='block';
   document.getElementById('navGradeBtns').innerHTML=
@@ -1058,6 +1065,417 @@ function renderSciCard(stu) {
         </div>
       </div>
     </div>`;
+}
+
+// ══════════════════════════════════════════
+// 모의지원 기능
+// ══════════════════════════════════════════
+let admData = null;
+let admLoading = false;
+
+async function loadAdmData() {
+  if (admData) return admData;
+  if (admLoading) return null;
+  admLoading = true;
+  try {
+    const resp = await fetch('data/admission_2027.json');
+    if (!resp.ok) return null;
+    const d = await resp.json();
+    admData = d;
+    admLoading = false;
+    return d;
+  } catch(e) {
+    admLoading = false;
+    console.log('admission_2027.json 로드 실패:', e);
+    return null;
+  }
+}
+
+// 학생 3월 모의 점수 가져오기
+function getStuMockScore() {
+  if (!curStu || !curCls) return null;
+  const hakbun = '1' + String(curCls).padStart(2,'0') + String(curStu).toString().padStart(2,'0');
+  // mock_mar 데이터에서 학생 찾기
+  if (!ALL[curCls]) return null;
+  const stu = ALL[curCls].find(s => s.n === curStu);
+  if (!stu || !stu.sc) return null;
+  return {
+    국어백분위: stu.sc.kor?.pct || null,
+    수학백분위: stu.sc.mat?.pct || null,
+    영어등급: stu.sc.eng?.gr || null,
+    한국사등급: stu.sc.hst?.gr || null,
+    탐구1백분위: stu.sc.sci?.pct || stu.sc.soc?.pct || null,
+    탐구2백분위: null,
+    국어표준: stu.sc.kor?.std || null,
+    수학표준: stu.sc.mat?.std || null,
+  };
+}
+
+// 환산점수 계산
+function calcScore(school, scores, subjectOpt) {
+  const K = admData.keys;
+  const s = school;
+  const getIdx = (key) => K.indexOf(key);
+
+  const scoreType = s[getIdx('수능활용점수')] || '';
+  const useStd = scoreType.includes('표준점수');
+  
+  const 국어비율 = s[getIdx('국어비율')] || 0;
+  const 수학비율 = s[getIdx('수학비율')] || 0;
+  const 영어비율 = s[getIdx('영어비율')] || 0;
+  const 탐구비율 = s[getIdx('탐구비율')] || 0;
+  const 한국사비율 = s[getIdx('한국사비율')] || 0;
+  const 전형총점 = s[getIdx('전형총점')] || 1000;
+  
+  const 영어방식 = s[getIdx('영어방식')];
+  const 영어등급점수 = s[getIdx('영어등급점수')];
+  const 한국사방식 = s[getIdx('한국사방식')];
+  const 한국사등급점수 = s[getIdx('한국사등급점수')];
+
+  // 과목 점수 선택 (표준점수 or 백분위)
+  const 국어점수 = useStd ? (scores.국어표준 || scores.국어백분위) : scores.국어백분위;
+  const 수학점수 = useStd ? (scores.수학표준 || scores.수학백분위) : scores.수학백분위;
+  const 탐구점수 = scores.탐구1백분위;
+
+  if (!국어점수 && !수학점수) return null;
+
+  const totalBasis = 국어비율 + 수학비율 + 탐구비율 + (영어방식 === '수능비율포함' ? 영어비율 : 0) + (한국사방식 === '수능비율포함' ? 한국사비율 : 0);
+  if (totalBasis === 0) return null;
+
+  let score = 0;
+
+  // 국·수·탐구 기본 점수
+  if (국어비율 > 0 && 국어점수) score += 국어점수 * (국어비율 / 100) * (전형총점 / 100);
+  if (수학비율 > 0 && 수학점수) score += 수학점수 * (수학비율 / 100) * (전형총점 / 100);
+  if (탐구비율 > 0 && 탐구점수) score += 탐구점수 * (탐구비율 / 100) * (전형총점 / 100);
+
+  // 영어 처리
+  const engGr = scores.영어등급;
+  if (engGr && 영어등급점수 && 영어방식) {
+    const engScore = 영어등급점수[String(engGr)] || 영어등급점수[engGr];
+    if (engScore !== undefined) {
+      if (영어방식 === '수능비율포함') {
+        score += engScore * (영어비율 / 100) * (전형총점 / 100);
+      } else {
+        // 가감점 방식 - 총점에 직접 더하거나 빼기
+        score += engScore;
+      }
+    }
+  }
+
+  // 한국사 처리
+  const hksGr = scores.한국사등급;
+  if (hksGr && 한국사등급점수 && 한국사방식) {
+    const hksScore = 한국사등급점수[String(hksGr)] || 한국사등급점수[hksGr];
+    if (hksScore !== undefined) {
+      if (한국사방식 === '수능비율포함') {
+        score += hksScore * (한국사비율 / 100) * (전형총점 / 100);
+      } else {
+        score += hksScore;
+      }
+    }
+  }
+
+  // 가산점 (미적/기하/과탐) - 수학선택 기반
+  const 미적가산 = s[getIdx('미적가산')] || 0;
+  const 기하가산 = s[getIdx('기하가산')] || 0;
+  const 과탐가산 = s[getIdx('과탐가산')] || 0;
+  if (subjectOpt === '미적분' && 미적가산 > 0) score += score * 미적가산 / 100;
+  if (subjectOpt === '기하' && 기하가산 > 0) score += score * 기하가산 / 100;
+
+  return Math.round(score * 10) / 10;
+}
+
+// 합격 가능성 분류 (백분위 기반 러프 추정)
+function classifyChance(scores, school) {
+  const K = admData.keys;
+  const scoreType = school[K.indexOf('수능활용점수')] || '';
+  
+  // 학생 대표 백분위 계산 (반영 과목 기준)
+  const 국어비율 = school[K.indexOf('국어비율')] || 0;
+  const 수학비율 = school[K.indexOf('수학비율')] || 0;
+  const 탐구비율 = school[K.indexOf('탐구비율')] || 0;
+
+  let totalRatio = 국어비율 + 수학비율 + 탐구비율;
+  if (totalRatio === 0) totalRatio = 100;
+
+  let weightedPct = 0;
+  if (국어비율 > 0 && scores.국어백분위) weightedPct += scores.국어백분위 * 국어비율 / totalRatio;
+  if (수학비율 > 0 && scores.수학백분위) weightedPct += scores.수학백분위 * 수학비율 / totalRatio;
+  if (탐구비율 > 0 && scores.탐구1백분위) weightedPct += scores.탐구1백분위 * 탐구비율 / totalRatio;
+
+  if (weightedPct === 0) return null;
+
+  // 러프한 합격 가능성 분류 (1학년 3월 기준)
+  // ⚠️ 실제 입결 데이터 없이 백분위만으로 추정 — 참고용
+  const 지역 = school[K.indexOf('지역')];
+  const 대학 = school[K.indexOf('대학')];
+  
+  // 주요 대학 기준으로 커트라인 러프 추정
+  const 서울상위 = ['서울대','연세대','고려대','성균관대','서강대','한양대','이화여대'];
+  const 서울중상위 = ['중앙대','경희대','한국외대','서울시립대','건국대','동국대','숭실대','홍익대'];
+  const 서울중위 = ['세종대','가톨릭대','국민대','명지대','서울과기대','덕성여대','동덕여대'];
+  
+  let cutPct = 60; // 기본값
+  if (서울상위.includes(대학)) cutPct = 93;
+  else if (서울중상위.includes(대학)) cutPct = 85;
+  else if (서울중위.includes(대학)) cutPct = 75;
+  else if (지역 === '서울') cutPct = 68;
+  else if (['경기','인천'].includes(지역)) cutPct = 60;
+  else cutPct = 52;
+
+  const diff = weightedPct - cutPct;
+  if (diff >= 5) return {label:'매우 안정', color:'#0b8a5e', bg:'#d4f5e5', icon:'✅✅'};
+  if (diff >= 2) return {label:'안정', color:'#1a6a3a', bg:'#e8f8f0', icon:'✅'};
+  if (diff >= -2) return {label:'적정', color:'#1060b0', bg:'#dbeeff', icon:'🎯'};
+  if (diff >= -5) return {label:'위험', color:'#c06000', bg:'#fff3e0', icon:'⚠️'};
+  return {label:'매우 위험', color:'#b02020', bg:'#ffe8e8', icon:'❌'};
+}
+
+// 모의지원 UI 렌더링
+async function renderAdmissionUI() {
+  const cardArea = document.getElementById('cardArea');
+  cardArea.innerHTML = '<div class="detail-card"><div class="ph">⏳ 입시 데이터 불러오는 중...</div></div>';
+
+  const d = await loadAdmData();
+  if (!d) {
+    cardArea.innerHTML = '<div class="detail-card"><div class="ph">❌ 입시 데이터 로드 실패</div></div>';
+    return;
+  }
+
+  const mockScore = getStuMockScore();
+  const stuName = curStu && curCls ? 
+    (ALL[curCls]?.find(s => s.n === curStu)?.nm || `${curCls}반 ${curStu}번`) : null;
+
+  const K = d.keys;
+  
+  // 대학 목록 (중복 제거)
+  const univList = [...new Set(d.data.map(s => s[K.indexOf('대학')]).filter(Boolean))].sort();
+  
+  cardArea.innerHTML = `
+    <div class="detail-card" style="max-width:100%">
+      <div style="font-size:16px;font-weight:700;color:#1a1a18;margin-bottom:12px">
+        🎓 정시 모의지원 <span style="font-size:11px;background:#fff3d6;color:#9a6200;padding:2px 8px;border-radius:5px;font-weight:600;margin-left:8px">2027학년도 전형계획 기준</span>
+      </div>
+
+      ${mockScore ? `
+      <div style="background:#e8f4ff;border-radius:10px;padding:12px 14px;margin-bottom:14px;border:1px solid #b0d4f0">
+        <div style="font-size:11px;color:#1a4a7a;font-weight:700;margin-bottom:6px">📊 ${stuName ? stuName+'의 ' : ''}3월 모의고사 성적 (반영 기준)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          ${mockScore.국어백분위 ? `<span style="font-size:12px;background:#fff;border-radius:6px;padding:3px 8px;border:1px solid #b0d4f0">국어 <b>${mockScore.국어백분위}%ile</b></span>` : ''}
+          ${mockScore.수학백분위 ? `<span style="font-size:12px;background:#fff;border-radius:6px;padding:3px 8px;border:1px solid #b0d4f0">수학 <b>${mockScore.수학백분위}%ile</b></span>` : ''}
+          ${mockScore.영어등급 ? `<span style="font-size:12px;background:#fff;border-radius:6px;padding:3px 8px;border:1px solid #b0d4f0">영어 <b>${mockScore.영어등급}등급</b></span>` : ''}
+          ${mockScore.탐구1백분위 ? `<span style="font-size:12px;background:#fff;border-radius:6px;padding:3px 8px;border:1px solid #b0d4f0">탐구 <b>${mockScore.탐구1백분위}%ile</b></span>` : ''}
+        </div>
+      </div>` : `
+      <div style="background:#f5f4ee;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#666">
+        💡 왼쪽에서 반 → 학생을 먼저 선택하면 해당 학생의 모의고사 점수가 자동으로 반영됩니다.<br>
+        직접 점수를 입력하여 시뮬레이션할 수도 있습니다.
+      </div>`}
+
+      <!-- 점수 직접 입력 -->
+      <div style="background:#f9f8f2;border-radius:10px;padding:12px 14px;margin-bottom:14px;border:1px solid #e8e7e0">
+        <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:10px">✏️ 점수 직접 입력 (백분위 기준)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div>
+            <label style="font-size:11px;color:#777">국어 백분위</label>
+            <input id="adm-kor" type="number" min="0" max="100" placeholder="${mockScore?.국어백분위 || ''}"
+              value="${mockScore?.국어백분위 || ''}"
+              style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:2px">
+          </div>
+          <div>
+            <label style="font-size:11px;color:#777">수학 백분위</label>
+            <input id="adm-mat" type="number" min="0" max="100" placeholder="${mockScore?.수학백분위 || ''}"
+              value="${mockScore?.수학백분위 || ''}"
+              style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:2px">
+          </div>
+          <div>
+            <label style="font-size:11px;color:#777">탐구 백분위 (평균)</label>
+            <input id="adm-sci" type="number" min="0" max="100" placeholder="${mockScore?.탐구1백분위 || ''}"
+              value="${mockScore?.탐구1백분위 || ''}"
+              style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:2px">
+          </div>
+          <div>
+            <label style="font-size:11px;color:#777">영어 등급</label>
+            <input id="adm-eng" type="number" min="1" max="9" placeholder="${mockScore?.영어등급 || ''}"
+              value="${mockScore?.영어등급 || ''}"
+              style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:2px">
+          </div>
+          <div>
+            <label style="font-size:11px;color:#777">한국사 등급</label>
+            <input id="adm-hst" type="number" min="1" max="9" placeholder="${mockScore?.한국사등급 || ''}"
+              value="${mockScore?.한국사등급 || ''}"
+              style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:2px">
+          </div>
+          <div>
+            <label style="font-size:11px;color:#777">수학 선택과목</label>
+            <select id="adm-mat-sub" style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:2px">
+              <option value="">선택안함</option>
+              <option value="미적분">미적분</option>
+              <option value="기하">기하</option>
+              <option value="확률통계">확률통계</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- 대학 검색 -->
+      <div style="background:#f9f8f2;border-radius:10px;padding:12px 14px;margin-bottom:14px;border:1px solid #e8e7e0">
+        <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:10px">🔍 대학·학과 검색</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div>
+            <label style="font-size:11px;color:#777">대학명</label>
+            <input id="adm-search-univ" type="text" placeholder="예: 서울대, 연세대"
+              style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:2px">
+          </div>
+          <div>
+            <label style="font-size:11px;color:#777">학과명</label>
+            <input id="adm-search-dept" type="text" placeholder="예: 컴퓨터, 경영"
+              style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:2px">
+          </div>
+          <div>
+            <label style="font-size:11px;color:#777">군</label>
+            <select id="adm-gun" style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:2px">
+              <option value="">전체</option>
+              <option value="가">가군</option>
+              <option value="나">나군</option>
+              <option value="다">다군</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px;color:#777">지역</label>
+            <select id="adm-region" style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:2px">
+              <option value="">전체</option>
+              <option value="서울">서울</option>
+              <option value="경기">경기/인천</option>
+              <option value="지방">지방</option>
+            </select>
+          </div>
+        </div>
+        <button onclick="runAdmSearch()"
+          style="width:100%;padding:10px;background:#1a1a18;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">
+          🔍 합격 가능성 분석
+        </button>
+      </div>
+
+      <!-- 결과 표시 -->
+      <div id="adm-result"></div>
+
+      <div style="font-size:10px;color:#aaa;margin-top:8px;padding:8px;background:#f5f4ee;border-radius:6px">
+        ⚠️ 본 분석은 2027학년도 전형계획 자료와 3월 모의고사 백분위를 기반으로 한 참고용 추정입니다.<br>
+        실제 합격선은 수험생 분포, 지원자 수 등에 따라 크게 달라질 수 있습니다. 반드시 전문 입시 자료를 함께 참고하세요.
+      </div>
+    </div>`;
+}
+
+// 검색 실행
+function runAdmSearch() {
+  if (!admData) return;
+  const K = admData.keys;
+
+  // 입력값 수집
+  const scores = {
+    국어백분위: parseFloat(document.getElementById('adm-kor').value) || null,
+    수학백분위: parseFloat(document.getElementById('adm-mat').value) || null,
+    탐구1백분위: parseFloat(document.getElementById('adm-sci').value) || null,
+    영어등급: parseInt(document.getElementById('adm-eng').value) || null,
+    한국사등급: parseInt(document.getElementById('adm-hst').value) || null,
+    국어표준: null, 수학표준: null
+  };
+  const subjectOpt = document.getElementById('adm-mat-sub').value;
+
+  // 필터 조건
+  const searchUniv = document.getElementById('adm-search-univ').value.trim();
+  const searchDept = document.getElementById('adm-search-dept').value.trim();
+  const gunFilter = document.getElementById('adm-gun').value;
+  const regionFilter = document.getElementById('adm-region').value;
+
+  if (!scores.국어백분위 && !scores.수학백분위) {
+    document.getElementById('adm-result').innerHTML = 
+      '<div style="text-align:center;color:#b02020;padding:16px;font-size:13px">국어 또는 수학 백분위를 입력해 주세요</div>';
+    return;
+  }
+
+  // 필터링
+  let filtered = admData.data.filter(s => {
+    const univ = s[K.indexOf('대학')] || '';
+    const dept = s[K.indexOf('학과')] || '';
+    const gun = s[K.indexOf('군')] || '';
+    const region = s[K.indexOf('지역')] || '';
+
+    if (searchUniv && !univ.includes(searchUniv)) return false;
+    if (searchDept && !dept.includes(searchDept)) return false;
+    if (gunFilter && gun !== gunFilter) return false;
+    if (regionFilter) {
+      if (regionFilter === '서울' && region !== '서울') return false;
+      if (regionFilter === '경기' && !['경기','인천'].includes(region)) return false;
+      if (regionFilter === '지방' && ['서울','경기','인천'].includes(region)) return false;
+    }
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    document.getElementById('adm-result').innerHTML = 
+      '<div style="text-align:center;color:#999;padding:20px;font-size:13px">검색 결과가 없습니다</div>';
+    return;
+  }
+
+  // 최대 100개로 제한
+  if (filtered.length > 100) filtered = filtered.slice(0, 100);
+
+  // 합격 가능성 계산 및 정렬
+  const results = filtered.map(s => {
+    const chance = classifyChance(scores, s);
+    return { school: s, chance };
+  }).filter(r => r.chance);
+
+  // 순서: 적정 → 안정 → 매우안정 → 위험 → 매우위험
+  const order = {'매우 안정':0,'안정':1,'적정':2,'위험':3,'매우 위험':4};
+  results.sort((a,b) => (order[a.chance.label]||5) - (order[b.chance.label]||5));
+
+  // 통계
+  const stats = {};
+  results.forEach(r => { stats[r.chance.label] = (stats[r.chance.label]||0)+1; });
+
+  const tableRows = results.map(r => {
+    const s = r.school;
+    const ch = r.chance;
+    return `
+      <tr style="border-bottom:1px solid #f0f0e8">
+        <td style="padding:8px 6px;font-size:12px;font-weight:700">${s[K.indexOf('대학')]}</td>
+        <td style="padding:8px 6px;font-size:11px;color:#555">${s[K.indexOf('학과')]}</td>
+        <td style="padding:8px 6px;font-size:11px;text-align:center">${s[K.indexOf('군')] || '-'}군</td>
+        <td style="padding:8px 6px;font-size:11px;text-align:center">${s[K.indexOf('수능활용점수')] || '-'}</td>
+        <td style="padding:8px 6px;text-align:center">
+          <span style="background:${ch.bg};color:${ch.color};border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;white-space:nowrap">
+            ${ch.icon} ${ch.label}
+          </span>
+        </td>
+      </tr>`;
+  }).join('');
+
+  const statHtml = Object.entries(stats).map(([k,v]) => {
+    const colors = {'매우 안정':'#0b8a5e','안정':'#1a6a3a','적정':'#1060b0','위험':'#c06000','매우 위험':'#b02020'};
+    return `<span style="font-size:11px;color:${colors[k]||'#555'};font-weight:700">${k} ${v}개</span>`;
+  }).join(' &nbsp;|&nbsp; ');
+
+  document.getElementById('adm-result').innerHTML = `
+    <div style="margin-bottom:8px;font-size:12px;color:#666">${statHtml}</div>
+    <div style="overflow-x:auto;border-radius:8px;border:1px solid #e8e7e0">
+      <table style="width:100%;border-collapse:collapse;background:#fff">
+        <thead>
+          <tr style="background:#f5f4ee">
+            <th style="padding:8px 6px;font-size:11px;color:#777;font-weight:600;text-align:left">대학</th>
+            <th style="padding:8px 6px;font-size:11px;color:#777;font-weight:600;text-align:left">학과</th>
+            <th style="padding:8px 6px;font-size:11px;color:#777;font-weight:600;text-align:center">군</th>
+            <th style="padding:8px 6px;font-size:11px;color:#777;font-weight:600;text-align:center">수능활용</th>
+            <th style="padding:8px 6px;font-size:11px;color:#777;font-weight:600;text-align:center">합격 가능성</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+    ${results.length >= 100 ? '<div style="text-align:center;color:#999;font-size:11px;margin-top:6px">※ 최대 100개까지 표시됩니다. 검색어를 좁혀주세요.</div>' : ''}`;
 }
 </script>
 </body>
